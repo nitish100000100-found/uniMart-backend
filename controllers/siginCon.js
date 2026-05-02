@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 async function signin(req, res, next) {
-  consoole.log("did ius recah sigin")
+  
   
   const { username, password } = req.body;
   
@@ -31,13 +31,12 @@ async function signin(req, res, next) {
         expiresIn: "7d",
       },
     );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: true,        
+  sameSite: "none",   
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
     res.status(200).json({ "message": "OK" });
   } catch (err) {
     console.log(err);
@@ -74,11 +73,11 @@ function isSignin(req, res,next) {
 }
 async function logOut(req, res,next){
   try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false, 
-      sameSite: "lax",
-    });
+  res.clearCookie("token", {
+  httpOnly: true,
+  secure: true,       
+  sameSite: "none",   
+});
 
     return res.status(200).json({
       success: true,
