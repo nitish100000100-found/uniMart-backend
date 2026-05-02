@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 async function signin(req, res, next) {
+  consoole.log("did ius recah sigin")
   
   const { username, password } = req.body;
   
