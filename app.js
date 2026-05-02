@@ -10,16 +10,17 @@ const jwt = require("jsonwebtoken");
 const signinRouter = require("./routes/signin.js");
 const singupRouter = require("./routes/signup.js");
 const sellRouter = require("./routes/sell.js");
-const homeRouter=require("./routes/home.js")
-const dashRouter=require("./routes/dash.js")
+const homeRouter = require("./routes/home.js");
+const dashRouter = require("./routes/dash.js");
 
-const dbUrl =process.env.DB_PATH
+const dbUrl = process.env.DB_PATH;
 
 const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: 
+    "https://uni-mart-frontend.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   }),
@@ -32,10 +33,8 @@ app.use((req, res, next) => {
 app.use("/signin", signinRouter);
 app.use("/signup", singupRouter);
 app.use("/sell", sellRouter);
-app.use("/home",homeRouter);
-app.use("/dash",dashRouter)
-
-
+app.use("/home", homeRouter);
+app.use("/dash", dashRouter);
 
 mongoose
   .connect(dbUrl)
