@@ -19,11 +19,14 @@ const app = express();
 
 app.use(
   cors({
-    origin: 
-    "https://uni-mart-frontend-git-main-nitish100000100-founds-projects.vercel.app",
+    origin: [
+      "https://uni-mart-frontend.vercel.app",
+      "https://uni-mart-frontend-git-main-nitish100000100-founds-projects.vercel.app",
+      "https://uni-mart-frontend-pybdqnhja-nitish100000100-founds-projects.vercel.app",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
-  }),
+  })
 );
 app.use(cookieParser());
 app.use(express.json());
