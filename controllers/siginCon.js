@@ -13,7 +13,7 @@ async function signin(req, res, next) {
     const user = await User.findOne({ username });
 
     if (!user) {
-      return res.status(200).json({"message":"what's happening"});
+      return res.status(200).json({"message":"This username doesn't exist"});
     }
 
 
