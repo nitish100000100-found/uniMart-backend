@@ -44,33 +44,21 @@ res.cookie("token", token, {
   }
 }
 
-function isSignin(req, res,next) {
-  console.log("here at is sign in")
-  
-  const token = req.cookies.token;
+function isSignin(req, res) {
+  const token = req.body.token;
+
   if (!token) {
-    console.log("token doesn't exist")
-    
-    return res.status(200).json({
-      success: false,
-      reason: "NO_TOKEN"
-    });
+    return res.json({ success: false, reason: "NO_TOKEN" });
   }
 
   try {
     const data = jwt.verify(token, process.env.JWT_SECRET);
-   
-    return res.status(200).json({
-      success: true,
-      data
-    });
+    return res.json({ success: true, data });
   } catch (err) {
-    return res.status(200).json({
-      success: false,
-      reason: "INVALID_TOKEN"
-    });
+    return res.json({ success: false, reason: "INVALID_TOKEN" });
   }
 }
+
 async function logOut(req, res,next){
   try {
   res.clearCookie("token", {
