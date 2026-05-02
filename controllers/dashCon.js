@@ -7,188 +7,127 @@ const { PurchaseRequest } = require("../models/purchaseRequest.js");
 
 async function removeFromCart(req, res, next) {
   const { item, username } = req.body;
-
   try {
     const existingBuyer = await Buyer.findOne({ username });
-
     if (!existingBuyer) {
-      return res.status(404).json({
-        message: "Buyer not found",
-      });
+      return res.status(404).json({ message: "Buyer not found" });
     }
-
     const exists = existingBuyer.wishlist.some(
       (it) => it._id.toString() === item._id.toString(),
     );
-
     if (!exists) {
-      return res.status(200).json({
-        message: "Item not in cart",
-      });
+      return res.status(200).json({ message: "Item not in cart" });
     }
-
     existingBuyer.wishlist = existingBuyer.wishlist.filter(
       (it) => it._id.toString() !== item._id.toString(),
     );
-
     await existingBuyer.save();
-
-    return res.status(200).json({
-      message: `${item.itemName} removed from cart`,
-    });
+    return res.status(200).json({ message: `${item.itemName} removed from cart` });
   } catch (err) {
-    return res.status(500).json({
-      message: `Couldn't remove ${item.itemName} from cart`,
-    });
+    return res.status(500).json({ message: `Couldn't remove ${item.itemName} from cart` });
   }
 }
-
-
 
 async function cancelBuyRequest(req, res, next) {
   const session = await mongoose.startSession();
   session.startTransaction();
   const { item, username } = req.body;
-
   try {
     const existingBuyer = await Buyer.findOne({ username }).session(session);
-
     if (!existingBuyer) {
       await session.abortTransaction();
       return res.status(404).json({ message: "Buyer not found" });
     }
-
     const exists = existingBuyer.requestSend.some(
       (it) => it._id.toString() === item._id.toString(),
     );
-
     if (!exists) {
       await session.abortTransaction();
       return res.status(200).json({ message: "Request not found" });
     }
-
     existingBuyer.requestSend = existingBuyer.requestSend.filter(
       (it) => it._id.toString() !== item._id.toString(),
     );
     existingBuyer.wishlist.push({ ...item, _id: item._id });
     await existingBuyer.save({ session });
-
     const deletedReq = await PurchaseRequest.findOneAndDelete({
       itemId: item._id,
       requestedBy: username,       
     }).session(session);
-
     if (!deletedReq) {
       await session.abortTransaction();
       return res.status(404).json({ message: "Purchase request not found" });
     }
-
     const seller = await Seller.findOne({ username: item.owner }).session(session);
-
     if (!seller) {
       await session.abortTransaction();
       return res.status(404).json({ message: "Seller not found" });
     }
-
     seller.purchaseRequests = seller.purchaseRequests.filter(
       (pr) => pr._id.toString() !== deletedReq._id.toString(),
     );
-
     await seller.save({ session });
     await session.commitTransaction();
-
-    return res.status(200).json({
-      message: `${item.itemName}'s buy request cancelled`,
-    });
+    return res.status(200).json({ message: `${item.itemName}'s buy request cancelled` });
   } catch (err) {
     await session.abortTransaction();
     console.error(err);
-    return res.status(500).json({
-      message: `Couldn't cancel ${req.body.item?.itemName}'s request`,
-    });
+    return res.status(500).json({ message: `Couldn't cancel ${req.body.item?.itemName}'s request` });
   } finally {
     session.endSession();
   }
 }
 
-
 async function sellerDash(req, res, next) {
   try {
     const { username } = req.body;
-
     const user = await User.findOne({ username });
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
     const existingSeller = await Seller.findOne({ username });
-
     if (existingSeller) {
-      return res.json({
-        user,
-        seller: existingSeller, 
-      });
+      return res.json({ user, seller: existingSeller });
     }
-
-    const newSeller = new Seller({
-      username: user.username,
-      phone: user.phone,
-    });
-
+    const newSeller = new Seller({ username: user.username, phone: user.phone });
     await newSeller.save();
-
-    return res.json({
-      user,
-      seller: newSeller, 
-    });
-
+    return res.json({ user, seller: newSeller });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Database error" });
   }
 }
 
-
 async function sellFxn(req, res, next) {
+  const session = await mongoose.startSession(); // ✅ transaction
+  session.startTransaction();
   try {
     const { itemID, buyerUsername } = req.body;
-
-    const item = await Item.findById(itemID);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
+    const item = await Item.findById(itemID).session(session);
+    if (!item) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Item not found" });
+    }
     const ownerUsername = item.owner;
-
     item.soldTo = buyerUsername;
-    await item.save();
-
+    await item.save({ session });
     const allRequests = await PurchaseRequest.find({ 
       itemId: new mongoose.Types.ObjectId(itemID) 
-    });
+    }).session(session);
     const allBuyerUsernames = allRequests.map((r) => r.requestedBy);
-
     await Buyer.updateMany(
       { username: { $in: allBuyerUsernames } },
-      {
-        $pull: {
-          requestSend: { _id: item._id },
-          wishlist: { _id: item._id },
-        },
-      }
+      { $pull: { requestSend: { _id: item._id }, wishlist: { _id: item._id } } },
+      { session }
     );
-
-    // ✅ Add item to the winning buyer's previousPurchases
     await Buyer.findOneAndUpdate(
       { username: buyerUsername },
-      {
-        $push: { previousPurchases: item },
-      }
+      { $push: { previousPurchases: item } },
+      { session }
     );
-
     await PurchaseRequest.deleteMany({ 
       itemId: new mongoose.Types.ObjectId(itemID) 
-    });
-
+    }, { session });
     await Seller.findOneAndUpdate(
       { username: ownerUsername },
       {
@@ -197,41 +136,41 @@ async function sellFxn(req, res, next) {
           purchaseRequests: { itemId: new mongoose.Types.ObjectId(itemID) },
         },
         $push: { sold: item },
-      }
+      },
+      { session }
     );
-
-    const newSeller = await Seller.findOne({ username: ownerUsername });
-    const user = await User.findOne({ username: ownerUsername });
-
+    const newSeller = await Seller.findOne({ username: ownerUsername }).session(session);
+    const user = await User.findOne({ username: ownerUsername }).session(session);
+    await session.commitTransaction();
     res.status(200).json({ user, seller: newSeller });
-
   } catch (err) {
+    await session.abortTransaction();
     next(err);
+  } finally {
+    session.endSession();
   }
 }
 
 async function rejectSellFxn(req, res, next) {
+  const session = await mongoose.startSession(); // ✅ transaction
+  session.startTransaction();
   try {
     const { itemID, buyerUsername } = req.body;
-
-    const item = await Item.findById(itemID);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
+    const item = await Item.findById(itemID).session(session);
+    if (!item) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Item not found" });
+    }
     const ownerUsername = item.owner;
-
     await PurchaseRequest.findOneAndDelete({
       itemId: new mongoose.Types.ObjectId(itemID),
       requestedBy: buyerUsername,
-    });
-
+    }).session(session);
     await Buyer.findOneAndUpdate(
       { username: buyerUsername },
-      { 
-        $pull: { requestSend: { _id: item._id } },
-        $push: { wishlist: item }
-      }
+      { $pull: { requestSend: { _id: item._id } }, $push: { wishlist: item } },
+      { session }
     );
-
     await Seller.findOneAndUpdate(
       { username: ownerUsername },
       {
@@ -241,33 +180,19 @@ async function rejectSellFxn(req, res, next) {
             requestedBy: buyerUsername 
           },
         },
-      }
+      },
+      { session }
     );
-
-    const newSeller = await Seller.findOne({ username: ownerUsername });
-    const user = await User.findOne({ username: ownerUsername });
-
+    const newSeller = await Seller.findOne({ username: ownerUsername }).session(session);
+    const user = await User.findOne({ username: ownerUsername }).session(session);
+    await session.commitTransaction();
     res.status(200).json({ user, seller: newSeller });
-
   } catch (err) {
+    await session.abortTransaction();
     next(err);
+  } finally {
+    session.endSession();
   }
 }
 
-module.exports={ removeFromCart,cancelBuyRequest ,sellerDash, sellFxn , rejectSellFxn }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+module.exports = { removeFromCart, cancelBuyRequest, sellerDash, sellFxn, rejectSellFxn };
