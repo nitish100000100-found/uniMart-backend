@@ -49,6 +49,7 @@ function isSignin(req, res,next) {
   
   const token = req.cookies.token;
   if (!token) {
+    console.log("token doesn't exist")
     
     return res.status(200).json({
       success: false,
