@@ -45,6 +45,7 @@ async function signin(req, res, next) {
 }
 
 function isSignin(req, res,next) {
+  console.log("here at is sign in")
   
   const token = req.cookies.token;
   if (!token) {
