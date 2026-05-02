@@ -45,25 +45,9 @@ function isSignin(req, res) {
   }
 }
 
-async function logOut(req, res,next){
-  try {
-  res.clearCookie("token", {
-  httpOnly: true,
-  secure: true,       
-  sameSite: "none",   
-});
-
-    return res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
-    });
-
-  } catch (err) {
-    return res.status(200).json({
-      success: false,
-      message: "Logout failed",
-    });
-  }
-};
+async function logOut() {
+  localStorage.removeItem("token");
+  return redirect("/");
+}
 
 module.exports = { signin, isSignin,logOut };
