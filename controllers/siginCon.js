@@ -32,6 +32,7 @@ async function signin(req, res, next) {
 
 function isSignin(req, res) {
   const token = req.body.token;
+  console.log("Token received:", token);
 
   if (!token) {
     return res.json({ success: false, reason: "NO_TOKEN" });
