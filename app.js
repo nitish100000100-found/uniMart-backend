@@ -20,7 +20,7 @@ const app = express();
 app.use(
   cors({
     origin: 
-    "https://uni-mart-frontend.vercel.ap",
+    "https://uni-mart-frontend.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   }),
