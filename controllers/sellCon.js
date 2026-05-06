@@ -122,72 +122,69 @@ async function firstDb(req, res) {
 // it removes an item fomr buyer wishlist and send request as well as from seller listed
 async function deleteItem(req, res) {
   const { item } = req.body;
-
   if (!item || !item._id) {
     return res.status(400).json({ message: "Invalid item data" });
   }
-
   const delURL = item.public_id;
-  const session = await mongoose.startSession();
 
-  try {
-    session.startTransaction();
+  const MAX_RETRIES = 3;
+  let attempt = 0;
 
-    await Seller.updateOne(
-      { username: item.owner },
-      { $pull: { listed: { _id: item._id } } },
-      { session },
-    );
-
-    await Seller.updateOne(
-      { username: item.owner },
-      { $pull: { purchaseRequests: { itemId: item._id } } },
-      { session },
-    );
-
-    await Item.findByIdAndDelete(item._id).session(session);
-
-    await Buyer.updateMany(
-      {},
-      { $pull: { wishlist: { _id: item._id } } },
-      { session },
-    );
-
-    await Buyer.updateMany(
-      {},
-      { $pull: { requestSend: { _id: item._id } } },
-      { session },
-    );
-
-    await PurchaseRequest.deleteMany(
-      { itemId: item._id },
-      { session },
-    );
-
-    const resu = await cloudinary.uploader.destroy(delURL, {
-      invalidate: true,
-    });
-
-    if (resu.result !== "ok" && resu.result !== "not found") {
-      throw new Error("Cloudinary delete failed");
+  while (attempt < MAX_RETRIES) {
+    attempt++;
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+      await Seller.updateOne(
+        { username: item.owner },
+        { $pull: { listed: { _id: item._id } } },
+        { session },
+      );
+      await Seller.updateOne(
+        { username: item.owner },
+        { $pull: { purchaseRequests: { itemId: item._id } } },
+        { session },
+      );
+      await Item.findByIdAndDelete(item._id).session(session);
+      await Buyer.updateMany(
+        {},
+        { $pull: { wishlist: { _id: item._id } } },
+        { session },
+      );
+      await Buyer.updateMany(
+        {},
+        { $pull: { requestSend: { _id: item._id } } },
+        { session },
+      );
+      await PurchaseRequest.deleteMany(
+        { itemId: item._id },
+        { session },
+      );
+      const resu = await cloudinary.uploader.destroy(delURL, {
+        invalidate: true,
+      });
+      if (resu.result !== "ok" && resu.result !== "not found") {
+        throw new Error("Cloudinary delete failed");
+      }
+      const updatedSeller = await Seller.findOne({
+        username: item.owner,
+      }).session(session);
+      await session.commitTransaction();
+      return res.status(200).json({
+        message: "Item deleted successfully",
+        seller: updatedSeller,
+      });
+    } catch (err) {
+      await session.abortTransaction();
+      if (err.hasErrorLabel("TransientTransactionError") && attempt < MAX_RETRIES) {
+        console.log(`Attempt ${attempt} failed, retrying...`);
+        continue;
+      }
+      console.log(err);
+      return res.status(500).json({ message: "Delete failed" });
+    } finally {
+      session.endSession();
     }
-
-    const updatedSeller = await Seller.findOne({
-      username: item.owner,
-    }).session(session);
-
-    await session.commitTransaction();
-
-    res.status(200).json({
-      message: "Item deleted successfully",
-      seller: updatedSeller,
-    });
-  } catch (err) {
-    await session.abortTransaction();
-    console.log(err);
-    res.status(500).json({ message: "Delete failed" });
-  } finally {
-    session.endSession();
   }
 }
 
